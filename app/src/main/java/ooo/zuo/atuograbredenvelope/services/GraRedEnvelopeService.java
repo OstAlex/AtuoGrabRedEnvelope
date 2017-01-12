@@ -10,37 +10,92 @@ import android.view.accessibility.AccessibilityNodeInfo;
 
 import java.util.List;
 
+import static android.view.accessibility.AccessibilityEvent.*;
+
 public class GraRedEnvelopeService extends AccessibilityService {
     private static final String TAG = "RedEnvelope";
+    private long contentEventTime = 0;
 
-    private boolean[] clickable = new boolean[]{true,true,true};
+
+    private boolean isBackToFront = false;
 
     public GraRedEnvelopeService() {
     }
 
+    /**
+     * 1、 在聊天页面收到新消息，先content_changed,再scrolled,两个EventTime在log上相差2.推理time在10以内就可以认为是来新消息了
+     * 在手动滚动聊天信息时，也会发生先content_changed再scrolled的顺序，但是两个eventTime间隔略大，在100以上。 but
+     * 消息往上滚动距离较远时，是不会自动滚动显示新消息的。因此不会触发这个事件检测。
+     *
+     * 以上当我没说，实践失败，eventTime间隔不确定.....
+     *
+     *
+     * 2、当处在非聊天页面，微信会显示通知，逻辑与微信处在后台处理逻辑一致。 3、通过微信通知进入聊天页面打开红包的逻辑： 获取微信通知中的内容，检查内容中是否包含“[微信红包]“，当然如果消息中包含这个文字也会触发233333，
+     * 打开通知，依次触发以下事件 TYPE_WINDOW_STATE_CHANGED， （TYPE_WINDOW_CONTENT_CHANGED 微信重启会发生）
+     * TYPE_VIEW_FOCUSED， TYPE_VIEW_SCROLLED， TYPE_WINDOW_CONTENT_CHANGED
+     * 这个时候聊天消息页面打开了，默认是显示最新的消息，可以进行红包检测了。
+     */
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
         int type = event.getEventType();
-        Log.d(TAG, event.toString());
+//        Log.d(TAG, event.toString());
 
         switch (type) {
             case AccessibilityEvent.TYPE_NOTIFICATION_STATE_CHANGED: {
                 handleNotification(event);
             }
             break;
-            case AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED:{
-                openLuckyMoney(event);
+            case AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED: {
+                contentEventTime = event.getEventTime();
+                int contentChangeTypes = event.getContentChangeTypes();
+                switch (contentChangeTypes){
+                    case CONTENT_CHANGE_TYPE_UNDEFINED:{
+                        Log.d(TAG, "contentChangeTypes: UNDEFINED");
+                    }
+                    break;
+                    case CONTENT_CHANGE_TYPE_TEXT:{
+                        Log.d(TAG, "contentChangeTypes: TEXT");
+                    }
+                    break;
+                    case CONTENT_CHANGE_TYPE_SUBTREE:{
+                        Log.d(TAG, "contentChangeTypes: SUBTREE");
+                    }
+                    break;
+                    case CONTENT_CHANGE_TYPE_CONTENT_DESCRIPTION:{
+                        Log.d(TAG, "contentChangeTypes: DESCRIPTION");
+                    }
+                    break;
+                }
+                AccessibilityNodeInfo source = event.getSource();
+                String s = source.getText().toString();
+                Log.d(TAG, "onAccessibilityEvent: "+s);
+                if (isBackToFront) {
+                    openLuckyMoney();
+                }
+            }
+            break;
+            case AccessibilityEvent.TYPE_VIEW_SCROLLED: {
+
+//                if (contentEventTime == 0) {
+//                    return;
+//                }
+//                long l = event.getEventTime() - contentEventTime;
+//                if (l < 10) {
+//                    Log.d(TAG, "onAccessibilityEvent: <10");
+//                    openLuckyMoney();
+//                }
+
             }
             break;
             case AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED: {
                 String className = event.getClassName().toString();
                 if (className.equals("com.tencent.mm.ui.LauncherUI")) {
                     // 2016/11/3 003 微信刚启动或者后台转前台会收到这个消息
-                    openLuckyMoney(event);
+//                    openLuckyMoney();
                 } else if (className.contains("com.tencent.mm.plugin.luckymoney.ui.LuckyMoneyReceiveUI")) {
                     openRedEnvelope(event);
                 } else if (className.equals("com.tencent.mm.plugin.luckymoney.ui.LuckyMoneyDetailUI")) {
-                    clickable[0] = false;
+
                 }
                 break;
             }
@@ -49,13 +104,11 @@ public class GraRedEnvelopeService extends AccessibilityService {
     }
 
     /**
-     * 点击打开
-     * @param event
+     * 点击 开
      */
     private void openRedEnvelope(AccessibilityEvent event) {
         AccessibilityNodeInfo source = event.getSource();
         List<AccessibilityNodeInfo> infos = source.findAccessibilityNodeInfosByViewId("com.tencent.mm:id/be_");
-        Log.d(TAG, "openRedEnvelope: source infos size:"+infos.size());
         for (AccessibilityNodeInfo info : infos) {
             info.performAction(AccessibilityNodeInfo.ACTION_CLICK);
         }
@@ -63,26 +116,11 @@ public class GraRedEnvelopeService extends AccessibilityService {
 
     }
 
-//    private void getOpenButtonList(AccessibilityNodeInfo node) {
-//        if (node == null) {
-//            return ;
-//        }
-//        if (node.getClassName().equals("android.widget.Button")) {
-//            node.performAction(AccessibilityNodeInfo.ACTION_CLICK);
-//            return ;
-//        }
-//        int childCount = node.getChildCount();
-//        for (int i = 0; i < childCount; i++) {
-//            AccessibilityNodeInfo child = node.getChild(i);
-//            if (child!=null){
-//                getOpenButtonList(child);
-//            }
-//        }
-//
-//    }
 
-
-    private void openLuckyMoney(AccessibilityEvent event) {
+    /**
+     * 检查最新的消息是否是红包并打开
+     */
+    private void openLuckyMoney() {
 
         AccessibilityNodeInfo rootNode = getRootInActiveWindow();
         if (rootNode == null) {
@@ -90,100 +128,68 @@ public class GraRedEnvelopeService extends AccessibilityService {
             return;
         }
 
-        Log.d(TAG, "openLuckyMoney: rootNode->"+rootNode);
         for (int i = 0; i < rootNode.getChildCount(); i++) {
             AccessibilityNodeInfo child = rootNode.getChild(i);
-            if (child.getClassName().toString().equals("android.widget.FrameLayout")){
-                Log.d(TAG, "openLuckyMoney: frameLayout:"+i);
-                for (int j = 0; j < child.getChildCount(); j++) {
-                    AccessibilityNodeInfo nodeInfo = child.getChild(j);
-                    AccessibilityNodeInfo luckyMoney = findLuckyMoney(nodeInfo);
-                    if (luckyMoney!=null){
-                        Log.d(TAG, "openLuckyMoney: LinearLayout:"+j);
+
+            //拿到window的内容区域，剩下的就是状态栏和导航栏了。
+            if (child.getClassName().toString().equals("android.widget.FrameLayout")) {
+                //查找聊天消息ListView
+                List<AccessibilityNodeInfo> nodes = child.findAccessibilityNodeInfosByViewId("com.tencent.mm:id/a1d");
+                child.recycle();
+
+                if (nodes != null && nodes.size() > 0) {
+                    //获取ListView，也就一个ListView
+                    AccessibilityNodeInfo listView = nodes.get(0);
+
+                    if (listView != null) {
+                        int childCount = listView.getChildCount();
+                        //获取最新的一条信息
+                        AccessibilityNodeInfo message = listView.getChild(childCount - 1);
+                        //检查最新消息是否是红包
+                        if (hasLuckyMoney(message)) {
+                            //是红包获取可点击的容器
+                            List<AccessibilityNodeInfo> money = message.findAccessibilityNodeInfosByViewId("com.tencent.mm:id/a48");
+                            message.recycle();
+                            //进行点击
+                            if (money != null && money.size() > 0) {
+                                for (int j = 0; j < money.size(); j++) {
+                                    AccessibilityNodeInfo info = money.get(j);
+                                    if (info != null) {
+                                        info.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+                                        isBackToFront = false;
+                                        info.recycle();
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
-
-
-
-
             }
-
         }
-
-
-//        //聊天列表
-//        AccessibilityNodeInfo listView = findListView(rootNode);
-//        if (listView!=null) {
-//            int childCount = listView.getChildCount();
-//            //最新一条信息
-//            AccessibilityNodeInfo child = listView.getChild(childCount - 1);
-//            //找红包
-//            AccessibilityNodeInfo luckyMoney = findLuckyMoney(child);
-//
-//            if (luckyMoney == null) {
-//                //没有红包结束
-//                return;
-//            }
-//            boolean performAction = luckyMoney.performAction(AccessibilityNodeInfo.ACTION_CLICK);
-//            Log.i(TAG, "openLuckyMoney: 我点" + performAction);
-//            AccessibilityNodeInfo parent = luckyMoney.getParent();
-//            while (parent != null&&clickable[0]) {
-//                parent.performAction(AccessibilityNodeInfo.ACTION_CLICK);
-//                parent = parent.getParent();
-//            }
-//            clickable[0] =true;
-//            if (parent!=null){
-//                parent.recycle();
-//            }
-//            listView.recycle();
-//            child.recycle();
-//            luckyMoney.recycle();
-//            rootNode.recycle();
-//
-//        }
-
+        rootNode.recycle();
     }
 
 
-    private AccessibilityNodeInfo findListView(AccessibilityNodeInfo nodeInfo){
-
-        if (nodeInfo.getClassName().toString().equals("android.widget.ListView")) {
-            return nodeInfo;
-        }else {
-            int childCount = nodeInfo.getChildCount();
-            for (int i = 0; i < childCount; i++) {
-                AccessibilityNodeInfo view = findListView(nodeInfo.getChild(i));
-                if (view!=null&&view.getClassName().toString().equals("android.widget.ListView")){
-                    return view;
-                }
-            }
-        }
-        return null;
-    }
-
-    private AccessibilityNodeInfo findLuckyMoney(AccessibilityNodeInfo nodeInfo) {
+    /**
+     * 检查是否包含“微信红包”
+     */
+    private boolean hasLuckyMoney(AccessibilityNodeInfo nodeInfo) {
         if (nodeInfo == null) {
-            return null;
+            return false;
         }
-        int childCount = nodeInfo.getChildCount();
-        if (childCount == 0) {
-            CharSequence text = nodeInfo.getText();
-            if (text != null && text.toString().contains("领取红包")) {
-                Log.i(TAG, "findLuckyMoney: 找到");
-                return nodeInfo;
-            }
-        } else {
-            for (int i = nodeInfo.getChildCount() - 1; i >= 0; i--) {
-                AccessibilityNodeInfo child = nodeInfo.getChild(i);
-                if (child != null) {
-                    AccessibilityNodeInfo info = findLuckyMoney(child);
-                    if (info != null) {
-                        return info;
-                    }
+        //左下角“微信红包”的TextView
+        List<AccessibilityNodeInfo> infos = nodeInfo.findAccessibilityNodeInfosByViewId("com.tencent.mm:id/a57");
+        if (infos != null && infos.size() > 0) {
+            //一般也就找到一个TextView
+            for (int i = 0; i < infos.size(); i++) {
+                //判断当前TextView是不是红包，因为群收款也是用的该TextView
+                AccessibilityNodeInfo info = infos.get(0);
+                if (info != null && info.getText().toString().contains("微信红包")) {
+                    return true;
                 }
             }
         }
-        return null;
+        return false;
     }
 
 
@@ -211,10 +217,8 @@ public class GraRedEnvelopeService extends AccessibilityService {
                     Notification notification = (Notification) parcelableData;
                     PendingIntent contentIntent = notification.contentIntent;
                     try {
-                        clickable[0] = true;
-                        clickable[1] = true;
-                        clickable[2] = true;
                         contentIntent.send();
+                        isBackToFront = true;
                     } catch (PendingIntent.CanceledException e) {
                         e.printStackTrace();
                     }
