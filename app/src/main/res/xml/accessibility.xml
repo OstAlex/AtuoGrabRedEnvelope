@@ -7,4 +7,5 @@
                        android:notificationTimeout="100"
                        android:packageNames="com.tencent.mm"
 
-    />
+    >
+</accessibility-service>

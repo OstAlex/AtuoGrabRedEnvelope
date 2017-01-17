@@ -66,9 +66,9 @@ public class GraRedEnvelopeService extends AccessibilityService {
                     }
                     break;
                 }
-                AccessibilityNodeInfo source = event.getSource();
-                String s = source.getText().toString();
-                Log.d(TAG, "onAccessibilityEvent: "+s);
+//                AccessibilityNodeInfo source = event.getSource();
+//                String s = source.getText().toString();
+//                Log.d(TAG, "onAccessibilityEvent: "+s);
                 if (isBackToFront) {
                     openLuckyMoney();
                 }
@@ -95,7 +95,9 @@ public class GraRedEnvelopeService extends AccessibilityService {
                 } else if (className.contains("com.tencent.mm.plugin.luckymoney.ui.LuckyMoneyReceiveUI")) {
                     openRedEnvelope(event);
                 } else if (className.equals("com.tencent.mm.plugin.luckymoney.ui.LuckyMoneyDetailUI")) {
-
+                    Log.d(TAG, "onAccessibilityEvent: LuckyMoneyDetailUI");
+                    performGlobalAction(GLOBAL_ACTION_BACK);
+                    performGlobalAction(GLOBAL_ACTION_HOME);
                 }
                 break;
             }
