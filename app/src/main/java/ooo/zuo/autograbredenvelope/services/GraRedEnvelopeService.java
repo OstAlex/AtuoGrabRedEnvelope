@@ -1,4 +1,4 @@
-package ooo.zuo.atuograbredenvelope.services;
+package ooo.zuo.autograbredenvelope.services;
 
 import android.accessibilityservice.AccessibilityService;
 import android.app.Notification;
@@ -10,7 +10,10 @@ import android.view.accessibility.AccessibilityNodeInfo;
 
 import java.util.List;
 
-import static android.view.accessibility.AccessibilityEvent.*;
+import static android.view.accessibility.AccessibilityEvent.CONTENT_CHANGE_TYPE_CONTENT_DESCRIPTION;
+import static android.view.accessibility.AccessibilityEvent.CONTENT_CHANGE_TYPE_SUBTREE;
+import static android.view.accessibility.AccessibilityEvent.CONTENT_CHANGE_TYPE_TEXT;
+import static android.view.accessibility.AccessibilityEvent.CONTENT_CHANGE_TYPE_UNDEFINED;
 
 public class GraRedEnvelopeService extends AccessibilityService {
     private static final String TAG = "RedEnvelope";
@@ -18,6 +21,7 @@ public class GraRedEnvelopeService extends AccessibilityService {
 
 
     private boolean isBackToFront = false;
+    private boolean isReadyToGetLucky = false;
 
     public GraRedEnvelopeService() {
     }
@@ -38,7 +42,7 @@ public class GraRedEnvelopeService extends AccessibilityService {
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
         int type = event.getEventType();
-//        Log.d(TAG, event.toString());
+        Log.d(TAG, event.toString());
 
         switch (type) {
             case AccessibilityEvent.TYPE_NOTIFICATION_STATE_CHANGED: {
@@ -55,6 +59,20 @@ public class GraRedEnvelopeService extends AccessibilityService {
                     break;
                     case CONTENT_CHANGE_TYPE_TEXT:{
                         Log.d(TAG, "contentChangeTypes: TEXT");
+                        if (isReadyToGetLucky){
+                            List<AccessibilityNodeInfo> infos = getRootInActiveWindow().findAccessibilityNodeInfosByViewId("com.tencent.mm:id/be9");
+                            if (infos!=null){
+                                for (AccessibilityNodeInfo info : infos) {
+                                    CharSequence text = info.getText();
+                                    if (text!=null&&text.toString().contains("手慢了")){
+                                        //红包没了。
+                                        performGlobalAction(GLOBAL_ACTION_BACK);
+                                        performGlobalAction(GLOBAL_ACTION_HOME);
+                                        isReadyToGetLucky = false;
+                                    }
+                                }
+                            }
+                        }
                     }
                     break;
                     case CONTENT_CHANGE_TYPE_SUBTREE:{
@@ -96,8 +114,11 @@ public class GraRedEnvelopeService extends AccessibilityService {
                     openRedEnvelope(event);
                 } else if (className.equals("com.tencent.mm.plugin.luckymoney.ui.LuckyMoneyDetailUI")) {
                     Log.d(TAG, "onAccessibilityEvent: LuckyMoneyDetailUI");
-                    performGlobalAction(GLOBAL_ACTION_BACK);
-                    performGlobalAction(GLOBAL_ACTION_HOME);
+                    if (isBackToFront){
+                        isBackToFront = false;
+                        performGlobalAction(GLOBAL_ACTION_BACK);
+                        performGlobalAction(GLOBAL_ACTION_HOME);
+                    }
                 }
                 break;
             }
@@ -109,11 +130,36 @@ public class GraRedEnvelopeService extends AccessibilityService {
      * 点击 开
      */
     private void openRedEnvelope(AccessibilityEvent event) {
+        isReadyToGetLucky = true;
         AccessibilityNodeInfo source = event.getSource();
+        //寻找“开”
         List<AccessibilityNodeInfo> infos = source.findAccessibilityNodeInfosByViewId("com.tencent.mm:id/be_");
-        for (AccessibilityNodeInfo info : infos) {
-            info.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+        if (infos!=null&&infos.size()>0){
+            for (AccessibilityNodeInfo info : infos) {
+                info.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+                isReadyToGetLucky = false;
+            }
+        }else {
+            //手慢了
+            infos = source.findAccessibilityNodeInfosByViewId("com.tencent.mm:id/be9");
+            if (infos!=null){
+                for (AccessibilityNodeInfo info : infos) {
+                    CharSequence text = info.getText();
+                    if (text!=null&&text.toString().contains("手慢了")){
+                        //红包没了。
+                        if (isBackToFront){
+                            performGlobalAction(GLOBAL_ACTION_BACK);
+                            performGlobalAction(GLOBAL_ACTION_HOME);
+                            isBackToFront = false;
+                        }
+                        isReadyToGetLucky = false;
+                    }
+                }
+
+
+            }
         }
+
 
 
     }
@@ -158,11 +204,12 @@ public class GraRedEnvelopeService extends AccessibilityService {
                                     AccessibilityNodeInfo info = money.get(j);
                                     if (info != null) {
                                         info.performAction(AccessibilityNodeInfo.ACTION_CLICK);
-                                        isBackToFront = false;
                                         info.recycle();
                                     }
                                 }
                             }
+                        }else {
+                            isBackToFront = false;
                         }
                     }
                 }

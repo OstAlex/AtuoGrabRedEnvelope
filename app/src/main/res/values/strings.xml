@@ -1,3 +1,16 @@
 <resources>
-    <string name="app_name">微信自动抢红包</string>
+    <string name="app_name">微信抢红包</string>
+    <string name="accessibility_description">
+        开启后将自动检测微信通知是否包含红包，检测为红包消息将自动实现如下操作无需人工干预：\n
+        \t 1、 点击通知，打开会话页面\n
+        \t 2、 检查最新一条消息是否为红包\n
+        \t 3、 点开红包\n
+        \t 4.1、 点“开”，开始抢红包\n
+        \t 4.1.1、 进入红包详情页面,点击“返回”、“Home”键\n
+        \t 4.1.2、 提示红包被抢光了，点击“返回”、“Home”键\n
+        \t 4.2、 红包被抢光了，点击“返回”、“Home”键\n\n\n
+        软件不需要网络权限，可以放心使用。\n\n
+        本软件仅供娱乐，因使用本软件造成的一切后果与软件作者无关。\n\n
+        Created by Kever
+    </string>
 </resources>
