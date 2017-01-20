@@ -1,9 +1,14 @@
 package ooo.zuo.autograbredenvelope.services;
 
 import android.accessibilityservice.AccessibilityService;
+import android.app.KeyguardManager;
 import android.app.Notification;
 import android.app.PendingIntent;
+import android.content.res.AssetFileDescriptor;
+import android.content.res.AssetManager;
+import android.media.MediaPlayer;
 import android.os.Parcelable;
+import android.os.PowerManager;
 import android.util.Log;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
@@ -19,11 +24,18 @@ public class GraRedEnvelopeService extends AccessibilityService {
     private static final String TAG = "RedEnvelope";
     private long contentEventTime = 0;
 
+    private boolean isScreenLocked = false;
+    private boolean isScreenOn = true;
 
     private boolean isBackToFront = false;
     private boolean isReadyToGetLucky = false;
 
     public GraRedEnvelopeService() {
+    }
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
     }
 
     /**
@@ -52,19 +64,19 @@ public class GraRedEnvelopeService extends AccessibilityService {
             case AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED: {
                 contentEventTime = event.getEventTime();
                 int contentChangeTypes = event.getContentChangeTypes();
-                switch (contentChangeTypes){
-                    case CONTENT_CHANGE_TYPE_UNDEFINED:{
+                switch (contentChangeTypes) {
+                    case CONTENT_CHANGE_TYPE_UNDEFINED: {
                         Log.d(TAG, "contentChangeTypes: UNDEFINED");
                     }
                     break;
-                    case CONTENT_CHANGE_TYPE_TEXT:{
+                    case CONTENT_CHANGE_TYPE_TEXT: {
                         Log.d(TAG, "contentChangeTypes: TEXT");
-                        if (isReadyToGetLucky){
+                        if (isReadyToGetLucky) {
                             List<AccessibilityNodeInfo> infos = getRootInActiveWindow().findAccessibilityNodeInfosByViewId("com.tencent.mm:id/be9");
-                            if (infos!=null){
+                            if (infos != null) {
                                 for (AccessibilityNodeInfo info : infos) {
                                     CharSequence text = info.getText();
-                                    if (text!=null&&text.toString().contains("手慢了")){
+                                    if (text != null && text.toString().contains("手慢了")) {
                                         //红包没了。
                                         performGlobalAction(GLOBAL_ACTION_BACK);
                                         performGlobalAction(GLOBAL_ACTION_HOME);
@@ -75,11 +87,11 @@ public class GraRedEnvelopeService extends AccessibilityService {
                         }
                     }
                     break;
-                    case CONTENT_CHANGE_TYPE_SUBTREE:{
+                    case CONTENT_CHANGE_TYPE_SUBTREE: {
                         Log.d(TAG, "contentChangeTypes: SUBTREE");
                     }
                     break;
-                    case CONTENT_CHANGE_TYPE_CONTENT_DESCRIPTION:{
+                    case CONTENT_CHANGE_TYPE_CONTENT_DESCRIPTION: {
                         Log.d(TAG, "contentChangeTypes: DESCRIPTION");
                     }
                     break;
@@ -114,7 +126,7 @@ public class GraRedEnvelopeService extends AccessibilityService {
                     openRedEnvelope(event);
                 } else if (className.equals("com.tencent.mm.plugin.luckymoney.ui.LuckyMoneyDetailUI")) {
                     Log.d(TAG, "onAccessibilityEvent: LuckyMoneyDetailUI");
-                    if (isBackToFront){
+                    if (isBackToFront) {
                         isBackToFront = false;
                         performGlobalAction(GLOBAL_ACTION_BACK);
                         performGlobalAction(GLOBAL_ACTION_HOME);
@@ -134,20 +146,20 @@ public class GraRedEnvelopeService extends AccessibilityService {
         AccessibilityNodeInfo source = event.getSource();
         //寻找“开”
         List<AccessibilityNodeInfo> infos = source.findAccessibilityNodeInfosByViewId("com.tencent.mm:id/be_");
-        if (infos!=null&&infos.size()>0){
+        if (infos != null && infos.size() > 0) {
             for (AccessibilityNodeInfo info : infos) {
                 info.performAction(AccessibilityNodeInfo.ACTION_CLICK);
                 isReadyToGetLucky = false;
             }
-        }else {
+        } else {
             //手慢了
             infos = source.findAccessibilityNodeInfosByViewId("com.tencent.mm:id/be9");
-            if (infos!=null){
+            if (infos != null) {
                 for (AccessibilityNodeInfo info : infos) {
                     CharSequence text = info.getText();
-                    if (text!=null&&text.toString().contains("手慢了")){
+                    if (text != null && text.toString().contains("手慢了")) {
                         //红包没了。
-                        if (isBackToFront){
+                        if (isBackToFront) {
                             performGlobalAction(GLOBAL_ACTION_BACK);
                             performGlobalAction(GLOBAL_ACTION_HOME);
                             isBackToFront = false;
@@ -159,7 +171,6 @@ public class GraRedEnvelopeService extends AccessibilityService {
 
             }
         }
-
 
 
     }
@@ -208,7 +219,12 @@ public class GraRedEnvelopeService extends AccessibilityService {
                                     }
                                 }
                             }
-                        }else {
+                        } else {
+                            //不是红包，返回，待命
+                            if (isBackToFront){
+                                performGlobalAction(GLOBAL_ACTION_BACK);
+                                performGlobalAction(GLOBAL_ACTION_HOME);
+                            }
                             isBackToFront = false;
                         }
                     }
@@ -261,17 +277,39 @@ public class GraRedEnvelopeService extends AccessibilityService {
         for (CharSequence text : texts) {
             Log.d(TAG, "handleNotification: " + text);
             if (text.toString().contains("[微信红包]")) {
-                Parcelable parcelableData = event.getParcelableData();
-                if (parcelableData != null && parcelableData instanceof Notification) {
-                    Notification notification = (Notification) parcelableData;
-                    PendingIntent contentIntent = notification.contentIntent;
-                    try {
-                        contentIntent.send();
-                        isBackToFront = true;
-                    } catch (PendingIntent.CanceledException e) {
-                        e.printStackTrace();
+                try {
+                    PowerManager powerManager = (PowerManager) getSystemService(POWER_SERVICE);
+                    boolean interactive = powerManager.isScreenOn();
+                    KeyguardManager keyguardManager = (KeyguardManager) getSystemService(KEYGUARD_SERVICE);
+                    boolean keyguardLocked = keyguardManager.isKeyguardLocked();
+                    if (!interactive||keyguardLocked) {
+                        //屏幕关闭或者锁屏 触发声音
+                        MediaPlayer player = new MediaPlayer();
+                        AssetManager assets = getResources().getAssets();
+                        Log.d(TAG, "handleNotification: ");
+                        AssetFileDescriptor assetFileDescriptor = assets.openFd("voice.mp3");
+                        player.setDataSource(assetFileDescriptor.getFileDescriptor(),assetFileDescriptor.getStartOffset(),assetFileDescriptor.getLength());
+                        player.prepare();
+                        player.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
+                            @Override
+                            public void onPrepared(MediaPlayer mediaPlayer) {
+                                mediaPlayer.start();
+                            }
+                        });
+                    }else {
+                        Parcelable parcelableData = event.getParcelableData();
+                        if (parcelableData != null && parcelableData instanceof Notification) {
+                            Notification notification = (Notification) parcelableData;
+                            PendingIntent contentIntent = notification.contentIntent;
+                            isBackToFront = true;
+                            contentIntent.send();
+                        }
+
                     }
+                } catch (Exception e) {
+                    e.printStackTrace();
                 }
+
             }
         }
     }
