@@ -12,6 +12,7 @@ import android.os.PowerManager;
 import android.util.Log;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
+import android.widget.Toast;
 
 import java.util.List;
 
@@ -72,7 +73,7 @@ public class GraRedEnvelopeService extends AccessibilityService {
                     case CONTENT_CHANGE_TYPE_TEXT: {
                         Log.d(TAG, "contentChangeTypes: TEXT");
                         if (isReadyToGetLucky) {
-                            List<AccessibilityNodeInfo> infos = getRootInActiveWindow().findAccessibilityNodeInfosByViewId("com.tencent.mm:id/be9");
+                            List<AccessibilityNodeInfo> infos = getRootInActiveWindow().findAccessibilityNodeInfosByViewId("com.tencent.mm:id/bi2");
                             if (infos != null) {
                                 for (AccessibilityNodeInfo info : infos) {
                                     CharSequence text = info.getText();
@@ -128,6 +129,17 @@ public class GraRedEnvelopeService extends AccessibilityService {
                     Log.d(TAG, "onAccessibilityEvent: LuckyMoneyDetailUI");
                     if (isBackToFront) {
                         isBackToFront = false;
+                        //获取金额控件
+                        //com.tencent.mm:id/bek
+                        List<AccessibilityNodeInfo> infos = getRootInActiveWindow().findAccessibilityNodeInfosByViewId("com.tencent.mm:id/bek");
+                        if (infos!=null){
+                            for (AccessibilityNodeInfo info : infos) {
+                                CharSequence text = info.getText();
+                                if (text!=null){
+                                    Toast.makeText(this,text+"元",Toast.LENGTH_SHORT).show();
+                                }
+                            }
+                        }
                         performGlobalAction(GLOBAL_ACTION_BACK);
                         performGlobalAction(GLOBAL_ACTION_HOME);
                     }
@@ -145,7 +157,8 @@ public class GraRedEnvelopeService extends AccessibilityService {
         isReadyToGetLucky = true;
         AccessibilityNodeInfo source = event.getSource();
         //寻找“开”
-        List<AccessibilityNodeInfo> infos = source.findAccessibilityNodeInfosByViewId("com.tencent.mm:id/be_");
+        // com.tencent.mm:id/be_
+        List<AccessibilityNodeInfo> infos = source.findAccessibilityNodeInfosByViewId("com.tencent.mm:id/bi3");
         if (infos != null && infos.size() > 0) {
             for (AccessibilityNodeInfo info : infos) {
                 info.performAction(AccessibilityNodeInfo.ACTION_CLICK);
@@ -153,7 +166,8 @@ public class GraRedEnvelopeService extends AccessibilityService {
             }
         } else {
             //手慢了
-            infos = source.findAccessibilityNodeInfosByViewId("com.tencent.mm:id/be9");
+            // com.tencent.mm:id/be9
+            infos = source.findAccessibilityNodeInfosByViewId("com.tencent.mm:id/bi2");
             if (infos != null) {
                 for (AccessibilityNodeInfo info : infos) {
                     CharSequence text = info.getText();
@@ -193,7 +207,8 @@ public class GraRedEnvelopeService extends AccessibilityService {
             //拿到window的内容区域，剩下的就是状态栏和导航栏了。
             if (child.getClassName().toString().equals("android.widget.FrameLayout")) {
                 //查找聊天消息ListView
-                List<AccessibilityNodeInfo> nodes = child.findAccessibilityNodeInfosByViewId("com.tencent.mm:id/a1d");
+                // com.tencent.mm:id/a1d
+                List<AccessibilityNodeInfo> nodes = child.findAccessibilityNodeInfosByViewId("com.tencent.mm:id/a22");
                 child.recycle();
 
                 if (nodes != null && nodes.size() > 0) {
@@ -207,7 +222,8 @@ public class GraRedEnvelopeService extends AccessibilityService {
                         //检查最新消息是否是红包
                         if (hasLuckyMoney(message)) {
                             //是红包获取可点击的容器
-                            List<AccessibilityNodeInfo> money = message.findAccessibilityNodeInfosByViewId("com.tencent.mm:id/a48");
+                            // com.tencent.mm:id/a48
+                            List<AccessibilityNodeInfo> money = message.findAccessibilityNodeInfosByViewId("com.tencent.mm:id/a4w");
                             message.recycle();
                             //进行点击
                             if (money != null && money.size() > 0) {
@@ -243,7 +259,8 @@ public class GraRedEnvelopeService extends AccessibilityService {
             return false;
         }
         //左下角“微信红包”的TextView
-        List<AccessibilityNodeInfo> infos = nodeInfo.findAccessibilityNodeInfosByViewId("com.tencent.mm:id/a57");
+        // com.tencent.mm:id/a57
+        List<AccessibilityNodeInfo> infos = nodeInfo.findAccessibilityNodeInfosByViewId("com.tencent.mm:id/a5v");
         if (infos != null && infos.size() > 0) {
             //一般也就找到一个TextView
             for (int i = 0; i < infos.size(); i++) {

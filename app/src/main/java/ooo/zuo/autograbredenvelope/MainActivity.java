@@ -24,10 +24,10 @@ public class MainActivity extends AppCompatActivity {
         builder.append("适用：\n");
         builder.setSpan(new ForegroundColorSpan(Color.RED),0,3, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         builder.setSpan(new AbsoluteSizeSpan(25,true),0,3,Spanned.SPAN_INCLUSIVE_EXCLUSIVE);
-        builder.append("微信版本： 6.5.3\nAndroid版本: 5.0 - 6.0.1\n");
+        builder.append("微信版本： 6.5.4\nAndroid版本: 5.0 - 6.0.1\n");
         builder.setSpan(new ForegroundColorSpan(Color.RED),9,15,Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         builder.append("此程序目前尚未完善，可能存在Bug或者缺陷。\n");
-        builder.append("此程序仅供娱乐，勿做他用。\n由此引发的一切后果和损失与程序作者无关。\n");
+        builder.append("此程序仅供娱乐，勿做他用。\n 由此造成的一切后果与程序作者无关\n\n");
         builder.append("Created by Kever \n\n");
         builder.append("↓↓↓点击按钮，进入设置开启功能↓↓↓");
 
